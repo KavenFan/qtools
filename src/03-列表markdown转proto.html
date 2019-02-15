@@ -1,0 +1,204 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>列表markdown转proto</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+    <script src="https://cdn.bootcss.com/jquery/3.3.1/jquery.min.js"></script>
+    <script src="https://cdn.bootcss.com/vue/2.5.22/vue.min.js"></script>
+
+    <!-- 最新版本的 Bootstrap 核心 CSS 文件 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@3.3.7/dist/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+
+    <!-- 最新的 Bootstrap 核心 JavaScript 文件 -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@3.3.7/dist/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
+
+    <script>
+        $(document).ready(function () {
+
+            
+            function testMarkdownColumn(s) {
+                return /\s*\w+\s*\|\s*(.*?)\s*\|\s*(.*)/.test(s);
+            }
+            
+            function testMarkdownColumnStart(s) {
+                return /\s*(-+)\s*\|\s*(-+)\s*\|\s*(.*)/.test(s);
+            }
+            
+            function replaceMarkdownColumn(s, count) {
+                var len = s.split('|').length;
+                if(len == 3){
+                    return s.replace(/\s*(\w+)\s*\|\s*(.*?)\s*\|\s*(.*)/, '// $3\nstring $1 = ' + count+';\n');
+                }else if(len > 3){
+                    var tmp = "";
+                    if(/\|\s*N\s*\|/.test(s)){
+                        tmp = "// optional\n";
+                    }else if(/\|\s*Y\s*\|/.test(s)){
+                        tmp = "// required\n";
+                    }
+                    return s.replace(/\s*(\w+)\s*\|\s*(.*?)\s*\|\s*(.*?)\|\s*(.*)/, tmp + '// $4\nstring $1 = ' + count+';\n');
+                }
+                return s;
+            }
+            
+            function aiMarkdownColumnToProto(content) {
+                var resContent = "";
+                var s = content;
+                
+                var sList = s.split("\n");
+                var rItems = [];
+                var count = 1;
+                for(var i=0;i<sList.length;i++){
+                    var kw = sList[i];
+                    if(!kw){
+                        rItems.push("");
+                        continue;
+                    }
+                    if(testMarkdownColumnStart(kw)){
+                        count = 1;
+                        rItems.push("\n");//加两行空白行
+                        continue;
+                    }
+                    if(testMarkdownColumn(kw)){
+                        kw = replaceMarkdownColumn(kw, count);
+                        count++;
+                    }
+                    rItems.push(kw);
+                }
+                
+                resContent = rItems.join("\n")
+                return resContent;
+            }
+
+
+            var vm = new Vue({
+                el: "#container",
+                data: {
+                    inputContent: [
+                    '## 请求数据',
+                    '',
+                    '参数名称    	| 类型及长度        | 必要  | 描述',
+                    '---         	| ---               | ---   | ---',
+                    'prefix			| varchar(8)		| N		| 默认为86，非86，返回全部',
+                    'mobile			| varchar(24)		| Y		| 手机号为空时，返回全部，',
+                    'location_type	| char(1)			| Y		| 1为手机号归属地定位，2为经纬度定位，当为1时，distance与direction返回值都为0，3为全部营业网点，默认为1',
+                    'latitude		| double			| Y		| location_type为2时必传，纬度',
+                    'longitude		| double			| Y		| location_type为2时必传，经度',
+                    '',
+                    '## 返回数据',
+                    '',
+                    '**nearby_org_list**',
+                    '',
+                    '附近营业部',
+                    '',
+                    '域名称      	| 类型及长度    | 描述',
+                    '--          	| --            | --',
+                    'org_id			| int			| 组织id',
+                    'org_type_id		| int			| 组织类型 1部门，2营业部，3团队，8分公司',
+                    'eb_area_id		| int			| 区域id',
+                    'org_name		| varchar(64)	| 组织名称',
+                    'org_full_name	| varchar(512)	| 组织全称',
+                    'org_code		| varchar(50)	| 组织代码',
+                    'org_desc		| varchar(512)	| 组织描述(目前为地址)',
+                    'org_level		| int			| 组织层级',
+                    'status			| char(1)		| 状态，0正常，2删除',
+                    'gps				| varchar(256)	| 营业部所在的纬度与经度，用,号分隔，如：23.092898,113.291608',
+                    'distance		| string		| 与app所在地的距离，单位为KM。对于filter_org_list结果集里的营业部，没有计算距离与方位，默认数值为null，请不要显示',
+                    'direction		| string		| 手机所在地到营业部相对于正东方向逆时针的方位角，对于非附近营业部，这个字段内容为null（如果手机与营业部在同一地点，返回-1）',
+                    ].join("\n"),
+                    outputContent: "",
+                    msg:{
+                        title:"帮助",
+                        content:[
+                            "将proto文件中的定义自动从1开始按顺序编号"
+                        ].join("<br/>")
+                    }
+                },
+                methods: {
+                    aiGen: function () {
+                        var self = this;
+                        self.outputContent = aiMarkdownColumnToProto(self.inputContent);
+                    },
+                    clearInputContent:function () {
+                        var self = this;
+                        self.inputContent = "";
+                    },
+                    clearInputTemplate:function () {
+                        var self = this;
+                        self.inputTemplate = "";
+                    },
+                    clearOutputContent:function () {
+                        var self = this;
+                        self.outputContent = "";
+                    }
+                }
+            });
+
+
+        });
+    </script>
+</head>
+<body>
+
+
+<div id="container" class="container ">
+
+    <div class="row">
+
+        <div class="col-lg-12 col-sm-12 col-md-12 col-xs-12">
+            <h3 class="text-center">列表markdown转proto</h3>
+        </div>
+        
+        <div class="col-lg-12 col-sm-12 col-md-12 col-xs-12 bs-callout bs-callout-warning">
+            <div class="alert alert-warning" v-html="msg.content"></div>
+        </div>
+        <div class="col-lg-12 col-sm-12 col-md-12 col-xs-12">
+
+            <div class="row">
+                <div class="col-lg-12 col-md-12 col-sm-12 col-xs-12" id="inputContent">
+                    <div class="row">
+                        <label class="col-sm-4 col-xs-4">输入</label>
+                    </div>
+
+                    <div class="row">
+                        <textarea type="text" rows="10" name="inputTemplate" v-model="inputContent"
+                                  placeholder="请输入数据" id="inputContentText"
+                                  class="form-control col-md-12 text-to-copy-1"></textarea>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+        <div class="col-lg-12 col-sm-12 col-md-12 col-xs-12 text-right" id="opButtons">
+            <button class="btn btn-primary" @click="clearInputTemplate()">清空模板</button>
+            <button class="btn btn-primary" @click="clearInputContent()">清空输入</button>
+            <button class="btn btn-primary" @click="clearOutputContent()">清空输出</button>
+            <button class="btn btn-success" @click="aiGen()">生成</button>
+        </div>
+
+
+        <div class="col-lg-12 col-sm-12 col-md-12 col-xs-12" id="outputContent">
+
+            <div class="row">
+                <label class="col-sm-2 col-xs-2">输出</label>
+            </div>
+            <div class="row">
+                <textarea type="text" rows="20" name="outputContent" id="outputTextContent" v-model="outputContent"
+                          placeholder=""
+                          class="form-control" readonly></textarea>
+            </div>
+        </div>
+    </div>
+
+
+</div>
+
+
+
+</body>
+</html>
