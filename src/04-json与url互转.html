@@ -1,0 +1,211 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>json与url互转</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+    <script src="https://cdn.bootcss.com/jquery/3.3.1/jquery.min.js"></script>
+    <script src="https://cdn.bootcss.com/vue/2.5.22/vue.min.js"></script>
+
+    <!-- 最新版本的 Bootstrap 核心 CSS 文件 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@3.3.7/dist/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+
+    <!-- 最新的 Bootstrap 核心 JavaScript 文件 -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@3.3.7/dist/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
+
+    <script>
+        $(document).ready(function () {
+            function convertJson2Url(data) {
+                try {
+                    var tempArr = [];
+                    var path = "";
+                    for (var i in data) {
+                        // 如果是_path
+                        if(decodeURIComponent(i) == '_path'){
+                            path = decodeURIComponent(data[i]);
+                            continue;
+                        }
+                        var key = encodeURIComponent(i);
+                        var value = encodeURIComponent(data[i]);
+                        tempArr.push(key + '=' + value);
+                    }
+                    var urlParamsStr = tempArr.join('&');
+                    if(path != ""){
+                        urlParamsStr = path+"?"+urlParamsStr;
+                    }
+                    return urlParamsStr;
+                } catch (err) {
+                    return '';
+                }
+            }   
+
+            function converUrl2Json(url) {
+                try {
+                    var index = url.indexOf('?');
+                    var path = url.substring(0, index);
+                    url = url.match(/\?([^#]+)/)[1];
+                    var obj = {}, arr = url.split('&');
+                    for (var i = 0; i < arr.length; i++) {
+                        var subArr = arr[i].split('=');
+                        obj[subArr[0]] = subArr[1];
+                    }
+                    obj['_path'] = path;
+                    return JSON.stringify(obj, null, 2);
+
+                } catch (err) {
+                    return null;
+                }
+            }
+
+
+            
+            function testUrl(s) {
+                return /\?([^#]+)/.test(s);
+            }
+            
+            function testJson(s) {
+                return /\s*\{(.*)\}\s*/.test(s.replace(/\n/g,""));
+            }
+            
+            
+            function aiConvertUrlAndJson(content) {
+                var resContent = "";
+                var s = content;
+
+                // 如果是json则全部一起处理
+                if(testJson(s)){
+                    try{
+                        var data = {};
+                        eval("data="+s);
+                        s = convertJson2Url(data);
+                        return s;
+                    }catch(err){
+                        return "转换错误: 1. 不是合法的json? 2. 数据异常?";
+                    }
+                } 
+
+                
+                // 否则就逐渐行处理
+                var sList = s.split("\n");
+                var rItems = [];
+                var count = 1;
+                for(var i=0;i<sList.length;i++){
+                    var kw = sList[i];
+                    if(!kw){
+                        rItems.push("");
+                        continue;
+                    }
+                    if(testUrl(kw)){
+                        kw = converUrl2Json(kw);
+                        count++;
+                    }
+                    rItems.push(kw);
+                }
+                
+                resContent = rItems.join("\n")
+                return resContent;
+            }
+
+
+            var vm = new Vue({
+                el: "#container",
+                data: {
+                    inputContent: [
+                    'http://www.xxx.com/test?name=zhangshan&age=100#hello'
+                    ].join("\n"),
+                    outputContent: "",
+                    msg:{
+                        title:"帮助",
+                        content:[
+                            "json与url参数格式互转"
+                        ].join("<br/>")
+                    }
+                },
+                methods: {
+                    aiGen: function () {
+                        var self = this;
+                        self.outputContent = aiConvertUrlAndJson(self.inputContent);
+                    },
+                    clearInputContent:function () {
+                        var self = this;
+                        self.inputContent = "";
+                    },
+                    clearInputTemplate:function () {
+                        var self = this;
+                        self.inputTemplate = "";
+                    },
+                    clearOutputContent:function () {
+                        var self = this;
+                        self.outputContent = "";
+                    }
+                }
+            });
+
+
+        });
+    </script>
+</head>
+<body>
+
+
+<div id="container" class="container ">
+
+    <div class="row">
+
+        <div class="col-lg-12 col-sm-12 col-md-12 col-xs-12">
+            <h3 class="text-center">json与url互转</h3>
+        </div>
+        
+        <div class="col-lg-12 col-sm-12 col-md-12 col-xs-12 bs-callout bs-callout-warning">
+            <div class="alert alert-warning" v-html="msg.content"></div>
+        </div>
+        <div class="col-lg-12 col-sm-12 col-md-12 col-xs-12">
+
+            <div class="row">
+                <div class="col-lg-12 col-md-12 col-sm-12 col-xs-12" id="inputContent">
+                    <div class="row">
+                        <label class="col-sm-4 col-xs-4">输入</label>
+                    </div>
+
+                    <div class="row">
+                        <textarea type="text" rows="10" name="inputTemplate" v-model="inputContent"
+                                  placeholder="请输入数据" id="inputContentText"
+                                  class="form-control col-md-12 text-to-copy-1"></textarea>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+        <div class="col-lg-12 col-sm-12 col-md-12 col-xs-12 text-right" id="opButtons">
+            <button class="btn btn-primary" @click="clearInputTemplate()">清空模板</button>
+            <button class="btn btn-primary" @click="clearInputContent()">清空输入</button>
+            <button class="btn btn-primary" @click="clearOutputContent()">清空输出</button>
+            <button class="btn btn-success" @click="aiGen()">生成</button>
+        </div>
+
+
+        <div class="col-lg-12 col-sm-12 col-md-12 col-xs-12" id="outputContent">
+
+            <div class="row">
+                <label class="col-sm-2 col-xs-2">输出</label>
+            </div>
+            <div class="row">
+                <textarea type="text" rows="20" name="outputContent" id="outputTextContent" v-model="outputContent"
+                          placeholder=""
+                          class="form-control" readonly></textarea>
+            </div>
+        </div>
+    </div>
+
+
+</div>
+
+
+
+</body>
+</html>
